@@ -1,6 +1,8 @@
 
 # Season Injury Stats.R compiles injury data by season relative to the number of players/pitchers
-# rostered in the MLB (that season)
+# rostered in the MLB (that season).
+# 
+# It then plots this data for two DVs (ucl_status and Days injury List)
 
 # ==============================================================================
 # load data
@@ -206,54 +208,205 @@ d_long <- d_pitchers %>%
                 names_to  = "variable",
                 values_to = "value")
 
-# by competition level (violin & jitter)
-plot_level <- ggplot(d_long, aes(level, value)) +
-   geom_jitter(aes(color = level), width = 0.15, height = 0.1, alpha = 0.5) +
-   geom_violin(alpha = 0.1, trim = FALSE) +
+# ==============================================================================
+# plot the data
+# ==============================================================================
+
+# Days injury List x level x Pitchclock 
+# -------------------------------------
+d_DIL_PC <- d_long %>% 
+   filter(variable == "Days injury List") %>%
+   group_by(level, Pitchclock) %>%
+   summarise(mean = mean(value, na.rm = TRUE),
+             sd   = sd(value, na.rm = TRUE),
+             n    = sum(!is.na(value)),
+             .groups = "drop") %>%
+   complete(level, Pitchclock,
+            fill = list(n = 0))
+
+# plot
+DIL_1 <- ggplot(d_DIL_PC, aes(x = level, y = mean, colour = Pitchclock)) +
+   geom_errorbar(aes(ymin = mean - sd,
+                     ymax = mean + sd),
+                 position = position_dodge(width = 0.7),
+                 width = 0.15,
+                 na.rm = TRUE) +
+   geom_point(position = position_dodge(width = 0.7),
+              size = 3,
+              na.rm = TRUE) +
+   geom_text(aes(label = ifelse(round(mean, 0) == 0, "", round(mean, 0))),
+             position = position_dodge(width = 0.7),
+             hjust = -0.5,
+             vjust = 0.5,
+             na.rm = TRUE,
+             show.legend = FALSE) +
+   scale_color_discrete(name   = "",
+                        labels = c("No PC", "Original PC", "Modified PC"),
+                        drop = FALSE) +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
    theme_classic() +
-   theme(legend.position = "bottom") +
-   facet_wrap(~variable, scales = "free_y")
+   labs(title = "Avg. Days on Injury List by Pitchclock",
+        x = NULL, y = NULL) +
+   theme(legend.position = "bottom",
+         plot.title = element_text(hjust = 0.5))
 
-ggsave(plot_level, file = "Tables and Figures/DVs x Competition Level.png",
-       height = 3, width = 8, dpi = 600)
+ggsave(DIL_1, file = "Tables and Figures/Avg. Days on Injury List by Pitchclock.png",
+       height = 5, width = 7, dpi = 600)
 
-# by pitch clock constraint (violin & jitter)
-plot_PC <- ggplot(d_long, aes(level, value, fill = factor(Pitchclock))) +
-   geom_jitter(aes(color = factor(Pitchclock)),
-               position = position_jitterdodge(jitter.width = 0.15,
-                                               dodge.width = 0.8),
-               alpha = 0.5) +
-   geom_violin(alpha = 0.1, trim = FALSE,
-               position = position_dodge(width = 0.8)) +
-   scale_fill_discrete(name    = "Pitch Clock",
-                       labels  = c("No PC", "Original PC", "Modified PC")) +
-   scale_color_discrete(name   = "Pitch Clock",
+# Days injury List x level x geographical restructure
+# ---------------------------------------------------
+d_DIL_geog <- d_long %>% 
+   filter(variable == "Days injury List") %>%
+   group_by(level, post_restructure) %>%
+   summarise(mean = mean(value, na.rm = TRUE),
+             sd   = sd(value, na.rm = TRUE),
+             .groups = "drop") %>%
+   complete(level, post_restructure)
+
+# plot
+DIL_2 <- ggplot(d_DIL_geog, aes(x = level, y = mean, colour = post_restructure)) +
+   geom_errorbar(aes(ymin = mean - sd,
+                     ymax = mean + sd),
+                 position = position_dodge(width = 0.7),
+                 width = 0.15,
+                 na.rm = TRUE) +
+   geom_point(position = position_dodge(width = 0.7),
+              size = 3,
+              na.rm = TRUE) +
+   geom_text(aes(label = ifelse(round(mean, 0) == 0, "", round(mean, 0))),
+             position = position_dodge(width = 0.7),
+             hjust = -0.5,
+             vjust = 0.5,
+             na.rm = TRUE,
+             show.legend = FALSE) +
+   scale_color_discrete(name   = "",
+                        labels = c("Pre", "Post"),
+                        drop = FALSE) +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+   theme_classic() +
+   labs(title = "Avg. Days on Injury List \n Pre-/Post-Geographical Restructure",
+        x = NULL, y = NULL) +
+   theme(legend.position = "bottom",
+         plot.title = element_text(hjust = 0.5))
+
+ggsave(DIL_2, file = "Tables and Figures/Avg. Days on Injury List by Geographical Restructure.png",
+       height = 5, width = 7, dpi = 600)
+
+# UCL status x level
+# ------------------
+d_UCL_PC <- d_long %>% 
+   filter(variable == "ucl_status") %>%
+   group_by(level, Pitchclock) %>%
+   summarise(count = sum(value, na.rm = TRUE),
+             .groups = "drop") %>%
+   complete(level, Pitchclock) %>%
+   mutate(missing = is.na(count),
+          count = replace_na(count, 0))
+
+# plot
+UCL_1 <- ggplot(d_UCL_PC, aes(x = level, y = count, fill = Pitchclock)) +
+   geom_col(width = 0.7,
+            position = position_dodge(width = 0.8)) +
+   geom_text(aes(label = ifelse(missing, "", count)),
+             position = position_dodge(width = 0.8),
+             vjust = -0.5) +
+   scale_fill_discrete(name    = "",
+                       labels  = c("No PC", "Original PC", "Modified PC"),
+                       drop = FALSE) +
+   scale_color_discrete(name   = "",
                         labels = c("No PC", "Original PC", "Modified PC")) +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
    theme_classic() +
-   theme(legend.position = "bottom") +
-   facet_wrap(~variable, scales = "free_y")
+   labs(title = "UCL Injury Count by Pitchclock",
+        x = NULL, y = NULL) +
+   theme(legend.position = "bottom",
+         plot.title = element_text(hjust = 0.5))
 
-ggsave(plot_PC, file = "Tables and Figures/DVs x Competition Level x Pitch Clock.png",
-       height = 3, width = 8, dpi = 600)
+ggsave(UCL_1, file = "Tables and Figures/UCL Injury Count by Pitchclock.png",
+       height = 5, width = 7, dpi = 600)
 
-# geographical restructure
-# ========================
+# UCL status x geographical restructure
+# -------------------------------------
+d_UCL_geog <- d_long %>% 
+   filter(variable == "ucl_status") %>%
+   group_by(level, post_restructure) %>%
+   summarise(count = sum(value, na.rm = TRUE),
+             .groups = "drop") %>%
+   complete(level, post_restructure) %>%
+   mutate(missing = is.na(count),
+          count = replace_na(count, 0))
 
-# by pitch clock constraint (violin & jitter)
-plot_GEO <- ggplot(d_long, aes(level, value, fill = factor(post_restructure))) +
-   geom_jitter(aes(color = factor(post_restructure)),
-               position = position_jitterdodge(jitter.width = 0.15,
-                                               dodge.width = 0.8),
-               alpha = 0.5) +
-   geom_violin(alpha = 0.1, trim = FALSE,
-               position = position_dodge(width = 0.8)) +
-   scale_fill_discrete(name    = "Pre- v.s Post-Restructure",
+# plot
+UCL_2 <- ggplot(d_UCL_geog, aes(x = level, y = count, fill = post_restructure)) +
+   geom_col(width = 0.5,
+            position = position_dodge(width = 0.6)) +
+   geom_text(aes(label = ifelse(missing, "", count)),
+             position = position_dodge(width = 0.6),
+             vjust = -0.5) +
+   scale_fill_discrete(name    = "",
                        labels  = c("Pre", "Post")) +
-   scale_color_discrete(name   = "Pre- v.s Post-Restructure",
+   scale_color_discrete(name   = "",
                         labels = c("Pre", "Post")) +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
    theme_classic() +
-   theme(legend.position = "bottom") +
-   facet_wrap(~variable, scales = "free_y")
+   labs(title = "UCL Injury Count \n Pre-/Post-Geographical Restructure",
+        x = NULL, y = NULL) +
+   theme(legend.position = "bottom",
+         plot.title = element_text(hjust = 0.5))
 
-ggsave(plot_GEO, file = "Tables and Figures/DVs x Competition Level x Geo Restructure.png",
-       height = 3, width = 8, dpi = 600)
+ggsave(UCL_2, file = "Tables and Figures/UCL Injury Count by Geographical Restructure.png",
+       height = 5, width = 7, dpi = 600)
+
+# ==============================================================================
+
+# # by competition level (violin & jitter)
+# plot_level <- ggplot(d_long, aes(level, value)) +
+#    geom_jitter(aes(color = level), width = 0.15, height = 0.1, alpha = 0.5) +
+#    geom_violin(alpha = 0.1, trim = FALSE) +
+#    theme_classic() +
+#    theme(legend.position = "bottom") +
+#    facet_wrap(~variable, scales = "free_y")
+# 
+# ggsave(plot_level, file = "Tables and Figures/DVs x Competition Level.png",
+#        height = 3, width = 8, dpi = 600)
+# 
+# # by pitch clock constraint (violin & jitter)
+# plot_PC <- ggplot(d_long, aes(level, value, fill = factor(Pitchclock))) +
+#    geom_jitter(aes(color = factor(Pitchclock)),
+#                position = position_jitterdodge(jitter.width = 0.15,
+#                                                dodge.width = 0.8),
+#                alpha = 0.5) +
+#    geom_violin(alpha = 0.1, trim = FALSE,
+#                position = position_dodge(width = 0.8)) +
+#    scale_fill_discrete(name    = "Pitch Clock",
+#                        labels  = c("No PC", "Original PC", "Modified PC")) +
+#    scale_color_discrete(name   = "Pitch Clock",
+#                         labels = c("No PC", "Original PC", "Modified PC")) +
+#    theme_classic() +
+#    theme(legend.position = "bottom") +
+#    facet_wrap(~variable, scales = "free_y")
+# 
+# ggsave(plot_PC, file = "Tables and Figures/DVs x Competition Level x Pitch Clock.png",
+#        height = 3, width = 8, dpi = 600)
+# 
+# # geographical restructure
+# # ========================
+# 
+# # by pitch clock constraint (violin & jitter)
+# plot_GEO <- ggplot(d_long, aes(level, value, fill = factor(post_restructure))) +
+#    geom_jitter(aes(color = factor(post_restructure)),
+#                position = position_jitterdodge(jitter.width = 0.15,
+#                                                dodge.width = 0.8),
+#                alpha = 0.5) +
+#    geom_violin(alpha = 0.1, trim = FALSE,
+#                position = position_dodge(width = 0.8)) +
+#    scale_fill_discrete(name    = "Pre- v.s Post-Restructure",
+#                        labels  = c("Pre", "Post")) +
+#    scale_color_discrete(name   = "Pre- v.s Post-Restructure",
+#                         labels = c("Pre", "Post")) +
+#    theme_classic() +
+#    theme(legend.position = "bottom") +
+#    facet_wrap(~variable, scales = "free_y")
+# 
+# ggsave(plot_GEO, file = "Tables and Figures/DVs x Competition Level x Geo Restructure.png",
+#        height = 3, width = 8, dpi = 600)
