@@ -13,7 +13,7 @@ library(psych)
 library(tidyverse)
 library(writexl)
 
-d <- read_excel("Data/Oringinal Data/CDavis_pitchclock.xlsx", 
+d <- read_excel("Data/Original Data/CDavis_pitchclock.xlsx", 
                 sheet = "master")
 
 # ==============================================================================
